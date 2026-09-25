@@ -3,6 +3,11 @@
   "version": "0.2.0",
   "private": true,
   "author": "cashwin1203",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cashwin1203/obsidian-second-brain-rag.git"
+  },
+  "homepage": "https://github.com/cashwin1203/obsidian-second-brain-rag#readme",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs production",

@@ -5,5 +5,6 @@
   "minAppVersion": "1.8.0",
   "description": "Local-first hybrid RAG across Obsidian notes and PDFs with inspectable sources.",
   "author": "cashwin1203",
+  "authorUrl": "https://github.com/cashwin1203",
   "isDesktopOnly": true
 }

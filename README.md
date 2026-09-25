@@ -4,6 +4,8 @@ A local-first Obsidian plugin implementing Retrieval-Augmented Generation (RAG) 
 
 This is an independent implementation by `cashwin1203`. External projects and technical documentation are used as design references only; this repository is not a fork and carries no third-party Git history.
 
+Repository: https://github.com/cashwin1203/obsidian-second-brain-rag
+
 ## RAG pipeline
 
 1. Parse Markdown by heading, PDFs by page, Word documents by text segment, and opted-in images into factual descriptions.
