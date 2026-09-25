@@ -1,4 +1,4 @@
-# Second Brain for Obsidian
+# Second Brain RAG for Obsidian
 
 A local-first Obsidian plugin implementing Retrieval-Augmented Generation (RAG) across Markdown, PDF, Word, and image content, with inspectable evidence behind every answer.
 
@@ -38,7 +38,7 @@ npm run build
 Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 ```text
-<vault>/.obsidian/plugins/second-brain/
+<vault>/.obsidian/plugins/cashwin-second-brain-rag/
 ```
 
 Restart Obsidian, open **Settings > Community plugins**, and enable **Second Brain**.
