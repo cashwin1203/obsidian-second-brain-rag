@@ -1,0 +1,67 @@
+.second-brain {
+  --sb-accent: var(--interactive-accent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.second-brain h2,
+.second-brain h3,
+.second-brain p {
+  margin: 0;
+}
+
+.second-brain textarea {
+  min-height: 96px;
+  resize: vertical;
+  width: 100%;
+}
+
+.second-brain__privacy,
+.second-brain__status,
+.second-brain__heading {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+.second-brain__answer {
+  border-top: 1px solid var(--background-modifier-border);
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+}
+
+.second-brain__answer p,
+.second-brain__source p {
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.second-brain__sources {
+  display: grid;
+  gap: 0;
+}
+
+.second-brain__source {
+  border-top: 1px solid var(--background-modifier-border);
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+}
+
+.second-brain__source-link {
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-accent);
+  font-weight: var(--font-semibold);
+  height: auto;
+  padding: 0;
+  text-align: left;
+}
+
+.second-brain__source-link:hover {
+  background: transparent;
+  color: var(--text-accent-hover);
+}
