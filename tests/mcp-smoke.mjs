@@ -19,6 +19,8 @@ test("MCP server exposes searchable vault evidence", async () => {
     assert.deepEqual(tools.tools.map((tool) => tool.name), ["search_brain", "read_source"]);
     const result = await client.callTool({ name: "search_brain", arguments: { query: "human approval", limit: 3 } });
     assert.match(result.content[0].text, /Evidence\.md/);
+    const source = await client.callTool({ name: "read_source", arguments: { sourcePath: "Evidence.md" } });
+    assert.match(source.content[0].text, /Human approval protects/);
   } finally {
     await client.close();
     await rm(vault, { recursive: true, force: true });

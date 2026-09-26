@@ -44,6 +44,24 @@
   gap: 0;
 }
 
+.second-brain__tools {
+  display: grid;
+  gap: 6px;
+}
+
+.second-brain__tool {
+  background: var(--background-secondary);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  padding: 8px 10px;
+}
+
+.second-brain__tool--error {
+  color: var(--text-error);
+}
+
 .second-brain__source {
   border-top: 1px solid var(--background-modifier-border);
   display: grid;

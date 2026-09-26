@@ -19,8 +19,9 @@ When I need information from my accumulated notes, help me find and synthesize i
 3. Generate answers only from retrieved evidence when a model is configured.
 4. Display the source path, heading, excerpt, and an action that opens the note.
 5. Re-index after vault changes.
-6. Refuse when evidence is missing.
+6. Refuse when evidence is missing or the generated answer cannot pass citation validation.
 7. Keep the vault read-only until a diff-and-approve workflow is implemented.
+8. Let a configured tool-capable model decide when to search and when to inspect a returned source, within a bounded number of steps.
 
 ## Success criteria
 
@@ -39,7 +40,7 @@ When I need information from my accumulated notes, help me find and synthesize i
 
 ## Current milestone
 
-The current milestone implements Retrieval-Augmented Generation (RAG) across Markdown, text-based PDFs, Word documents, and opted-in images. Retrieval uses BM25 by default and hybrid BM25 + vector ranking when an embedding model is configured. A read-only MCP server exposes vault search and source reading to compatible AI clients.
+The current milestone implements Retrieval-Augmented Generation (RAG) across Markdown, text-based PDFs, Word documents, and opted-in images. Retrieval uses BM25 by default and hybrid BM25 + vector ranking when an embedding model is configured. A bounded model-controlled agent can call the same strictly validated `search_brain` and `read_source` capabilities exposed by the read-only MCP server. The UI displays tool steps, rejects unsupported citations, attempts one citation repair, and refuses when supported evidence is unavailable.
 
 ## Deferred until measured
 
@@ -51,4 +52,6 @@ The current milestone implements Retrieval-Augmented Generation (RAG) across Mar
 - Web ingestion
 - AI-maintained wiki pages
 - Approval-gated writes
+- Run history, token/cost tracing, latency diagnostics, and sanitized diagnostic export
+- Comprehensive retrieval, tool-selection, groundedness, and generation evaluation
 - Cloud sync and multi-user access

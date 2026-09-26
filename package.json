@@ -1,6 +1,6 @@
 {
   "name": "cashwin-obsidian-second-brain-rag",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "author": "cashwin1203",
   "repository": {
@@ -14,7 +14,8 @@
     "dev": "node esbuild.config.mjs",
     "eval": "node scripts/evaluate.mjs",
     "mcp": "node mcp-server.mjs",
-    "test": "node --test tests/retrieval.test.js",
+    "test": "node --test tests/retrieval.test.js && tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "test:mcp": "npm run build && node --test tests/mcp-smoke.mjs"
   },
   "devDependencies": {
@@ -22,6 +23,7 @@
     "builtin-modules": "^4.0.0",
     "esbuild": "^0.25.0",
     "obsidian": "latest",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.0"
   },
   "dependencies": {

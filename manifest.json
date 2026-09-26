@@ -1,7 +1,7 @@
 {
   "id": "cashwin-second-brain-rag",
   "name": "Second Brain RAG",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.8.0",
   "description": "Local-first hybrid RAG across Obsidian notes and PDFs with inspectable sources.",
   "author": "cashwin1203",
