@@ -32,6 +32,10 @@ Without an embedding model the plugin remains a complete sparse-RAG implementati
 - Versioned agent prompt with untrusted-content instructions
 - Unsupported-citation detection, citation repair, and insufficient-evidence refusal
 - Per-file ingestion timeouts so failed PDFs do not block the remaining vault
+- Local privacy-safe traces for answer and indexing runs (latest 100)
+- Chat, embedding, and image-call latency, retry, token, and configurable cost tracking
+- Retrieval-mode, BM25 fallback, typed failure, tool latency, and end-to-end latency tracking
+- Hashed request/response fingerprints without raw prompt, response, vault excerpt, API-key, or authorization-header logging
 
 ## Development
 
@@ -64,6 +68,19 @@ Leave all model fields empty for fully local BM25 retrieval.
 
 The maximum agent-step setting defaults to six and has a hard limit of ten. Retrieval-only mode does not invoke the agent or a generation model.
 
+Optional pricing is configured in **Model pricing (USD per million tokens)** as JSON keyed by the exact model ID, for example:
+
+```json
+{
+  "gpt-model-id": {
+    "inputPerMillionUsd": 1,
+    "outputPerMillionUsd": 2
+  }
+}
+```
+
+Token counts are recorded only when the endpoint reports them; missing usage is labelled unavailable rather than estimated. Local endpoints default to zero cost when no price is configured. Remote models without configured prices have unavailable cost.
+
 ## MCP server
 
 Build the project, then configure any standards-compatible MCP client with:
@@ -85,6 +102,8 @@ The server is read-only. It searches Markdown, PDFs, and Word documents and can 
 Markdown, PDF text, and Word text are extracted locally. Embedding text is sent only when an embedding model is configured; retrieved excerpts are sent only when an answer model is configured; images are sent only when an image model is configured. The plugin does not create, modify, rename, or delete notes.
 
 Vault excerpts and tool results are treated as untrusted data. During an agent run, `read_source` can only open paths previously returned by `search_brain`. No write tool is registered; the shared executor denies any future write-capable tool unless a human-approval callback explicitly permits that invocation.
+
+Run traces are stored only in this vault's Obsidian plugin data. They contain hashes, lengths, model and tool identifiers, timings, usage, costs, retrieval modes, retry counts, and typed error categories—not raw questions, prompts, model responses, source text, API keys, or authorization headers. A diagnostics screen and sanitized export are intentionally deferred to the next phase.
 
 Scanned PDFs still require OCR. Gmail requires a separate read-only OAuth connection and is intentionally not presented as working until credentials are supplied. Audio and video ingestion follow the document and image milestone.
 

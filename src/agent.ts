@@ -3,6 +3,7 @@ import type { AgentModelClient, ChatMessage } from "./model-client.js";
 import { AGENT_PROMPT, CITATION_REPAIR_PROMPT } from "./prompts.js";
 import { findPromptInjectionSignals, validateAnswer, type AnswerQuality } from "./quality.js";
 import { executeTool, toOpenAITools, type ToolDefinition } from "./tools.js";
+import type { RunTraceRecorder } from "./run-history.js";
 
 const REFUSAL = "I cannot answer that from the available vault evidence.";
 
@@ -26,6 +27,7 @@ export interface AgentRunOptions {
   client: AgentModelClient;
   tools: ToolDefinition[];
   maxSteps?: number;
+  trace?: RunTraceRecorder;
 }
 
 export async function runAgent(options: AgentRunOptions): Promise<AgentResult> {
@@ -73,9 +75,15 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentResult> {
           try {
             args = JSON.parse(call.arguments);
           } catch {
+            options.trace?.recordToolCall({
+              toolName: call.name,
+              status: "failure",
+              latencyMs: 0,
+              errorCategory: "tool_validation",
+            });
             throw new Error("Tool arguments were not valid JSON.");
           }
-          let result = await executeTool(options.tools, call.name, args, { allowedSourcePaths });
+          let result = await executeTool(options.tools, call.name, args, { allowedSourcePaths, trace: options.trace });
           const search = searchBrainResultSchema.safeParse(result);
           if (call.name === "search_brain" && search.success) {
             const known = new Map(evidence.map((source) => [evidenceKey(source), source]));
@@ -108,18 +116,25 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentResult> {
       continue;
     }
 
-    if (!evidence.length) return finish(REFUSAL, true);
+    if (!evidence.length) {
+      options.trace?.recordError("insufficient_evidence", "answer_validation");
+      return finish(REFUSAL, true);
+    }
     const quality = validateAnswer(turn.content, evidence);
     if (quality.acceptable) return finish(turn.content, quality.refusal);
     if (!repairAttempted && step < maxSteps) {
       repairAttempted = true;
+      options.trace?.recordQualityRepair();
+      options.trace?.recordError("citation_invalid", "answer_validation");
       messages.push({ role: "assistant", content: turn.content });
       messages.push({ role: "user", content: CITATION_REPAIR_PROMPT });
       continue;
     }
+    options.trace?.recordError("citation_invalid", "answer_validation");
     return finish(REFUSAL, true);
   }
 
+  options.trace?.recordError("max_steps", "agent_loop");
   return finish("I stopped because the agent reached its maximum step limit without a supported answer.", true);
 }
 

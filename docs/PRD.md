@@ -42,6 +42,8 @@ When I need information from my accumulated notes, help me find and synthesize i
 
 The current milestone implements Retrieval-Augmented Generation (RAG) across Markdown, text-based PDFs, Word documents, and opted-in images. Retrieval uses BM25 by default and hybrid BM25 + vector ranking when an embedding model is configured. A bounded model-controlled agent can call the same strictly validated `search_brain` and `read_source` capabilities exposed by the read-only MCP server. The UI displays tool steps, rejects unsupported citations, attempts one citation repair, and refuses when supported evidence is unavailable.
 
+The latest 100 answer and indexing runs retain privacy-safe local metrics: prompt/request/response fingerprints and lengths, prompt version, retrieval mode, fallback use, model/tool/retrieval/end-to-end latency, retry counts, typed errors, provider-reported token usage, and configurable model cost. Raw questions, prompts, responses, source excerpts, API keys, and authorization headers are not stored.
+
 ## Deferred until measured
 
 - Retrieval evaluation and reranking
@@ -52,6 +54,6 @@ The current milestone implements Retrieval-Augmented Generation (RAG) across Mar
 - Web ingestion
 - AI-maintained wiki pages
 - Approval-gated writes
-- Run history, token/cost tracing, latency diagnostics, and sanitized diagnostic export
+- Run-history and diagnostics UI, opt-in raw trace storage, and sanitized diagnostic export
 - Comprehensive retrieval, tool-selection, groundedness, and generation evaluation
 - Cloud sync and multi-user access

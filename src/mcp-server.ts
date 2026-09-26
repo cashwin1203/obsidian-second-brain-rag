@@ -119,7 +119,7 @@ const tools = createReadOnlyTools({
   },
 });
 
-const server = new McpServer({ name: "obsidian-second-brain", version: "0.3.0" });
+const server = new McpServer({ name: "obsidian-second-brain", version: "0.4.0" });
 
 server.registerTool("search_brain", {
   description: "Search Markdown notes, text-based PDFs, and Word documents in the configured Obsidian vault.",

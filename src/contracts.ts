@@ -2,6 +2,11 @@ import * as z from "zod/v4";
 
 export const retrievalModeSchema = z.enum(["bm25", "vector", "hybrid", "bm25_fallback"]);
 
+export const modelPricingSchema = z.record(z.string().min(1), z.object({
+  inputPerMillionUsd: z.number().min(0),
+  outputPerMillionUsd: z.number().min(0),
+}).strict());
+
 export const evidenceSchema = z.object({
   id: z.string().regex(/^S\d+$/),
   path: z.string().min(1),
@@ -51,4 +56,3 @@ export type ReadSourceArgs = z.infer<typeof readSourceArgsSchema>;
 export type SearchBrainResult = z.infer<typeof searchBrainResultSchema>;
 export type ReadSourceResult = z.infer<typeof readSourceResultSchema>;
 export type ToolPermission = "read" | "write";
-
