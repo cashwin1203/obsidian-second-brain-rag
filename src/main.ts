@@ -19,9 +19,12 @@ import {
   parsePdfPages,
   searchIndex,
   searchVectorIndex,
+  withTimeout,
 } from "./retrieval.js";
 
 const VIEW_TYPE = "second-brain-view";
+const PDF_EXTRACTION_TIMEOUT_MS = 120_000;
+const MODEL_REQUEST_TIMEOUT_MS = 60_000;
 
 interface SecondBrainSettings {
   baseUrl: string;
@@ -104,17 +107,29 @@ export default class SecondBrainPlugin extends Plugin {
     const imageFiles = this.app.vault.getFiles().filter((file) => ["png", "jpg", "jpeg", "webp", "gif"].includes(file.extension.toLowerCase()));
     const pdfChunks = [];
     const documentChunks = [];
+    let indexedPdfFiles = 0;
+    const progress = showNotice ? new Notice(`Second Brain: reading 0/${pdfFiles.length} PDFs…`, 0) : null;
     this.ingestionFailures = [];
-    for (const file of pdfFiles) {
+    for (const [fileIndex, file] of pdfFiles.entries()) {
       try {
         const data = new Uint8Array(await this.app.vault.readBinary(file));
-        const extracted = await extractText(data, { mergePages: false });
+        const extracted = await withTimeout(
+          extractText(data, { mergePages: false }),
+          PDF_EXTRACTION_TIMEOUT_MS,
+          "PDF extraction timed out",
+        );
         const pages = Array.isArray(extracted.text) ? extracted.text : [extracted.text];
         const chunks = parsePdfPages(file.path, pages);
-        if (chunks.length) pdfChunks.push(...chunks);
+        if (chunks.length) {
+          pdfChunks.push(...chunks);
+          indexedPdfFiles += 1;
+        }
         else this.ingestionFailures.push(`${file.path} (no embedded text; OCR required)`);
-      } catch {
-        this.ingestionFailures.push(file.path);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "PDF extraction failed";
+        this.ingestionFailures.push(`${file.path} (${reason})`);
+      } finally {
+        progress?.setMessage(`Second Brain: reading ${fileIndex + 1}/${pdfFiles.length} PDFs…`);
       }
     }
     for (const file of docxFiles) {
@@ -145,12 +160,21 @@ export default class SecondBrainPlugin extends Plugin {
       ...pdfChunks,
       ...documentChunks,
     ]);
-    if (this.settings.embeddingModel) await this.refreshEmbeddings();
-    else await this.persistData();
+    if (this.settings.embeddingModel) {
+      progress?.setMessage(`Second Brain: creating embeddings for ${this.index.chunks.length} chunks…`);
+      try {
+        await this.refreshEmbeddings();
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "embedding request failed";
+        this.ingestionFailures.push(`Embeddings (${reason})`);
+        await this.persistData();
+      }
+    } else await this.persistData();
+    progress?.hide();
     if (showNotice) {
       const warning = this.ingestionFailures.length ? ` ${this.ingestionFailures.length} file(s) need attention.` : "";
       const images = this.settings.imageModel ? ` and ${imageFiles.length} images` : "";
-      new Notice(`Second Brain indexed ${markdownFiles.length} notes, ${pdfFiles.length} PDFs, ${docxFiles.length} Word documents${images}.${warning}`);
+      new Notice(`Second Brain indexed ${markdownFiles.length} notes, ${indexedPdfFiles}/${pdfFiles.length} PDFs, ${docxFiles.length} Word documents${images}.${warning}`);
     }
   }
 
@@ -222,14 +246,14 @@ export default class SecondBrainPlugin extends Plugin {
 
   private async embedTexts(input: string[]) {
     const endpoint = validateEndpoint(this.settings.baseUrl);
-    const response = await fetch(`${endpoint}/embeddings`, {
+    const response = await withTimeout(fetch(`${endpoint}/embeddings`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(this.settings.apiKey ? { Authorization: `Bearer ${this.settings.apiKey}` } : {}),
       },
       body: JSON.stringify({ model: this.settings.embeddingModel, input }),
-    });
+    }), MODEL_REQUEST_TIMEOUT_MS, "embedding request timed out");
     if (!response.ok) throw new Error(`embedding request failed (${response.status})`);
     const payload = await response.json();
     const vectors = payload?.data?.sort((a: { index: number }, b: { index: number }) => a.index - b.index)
@@ -371,7 +395,7 @@ class SecondBrainSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Model").setDesc("Example: llama3.2 or an OpenAI model ID.").addText((text) => text
       .setValue(this.plugin.settings.model)
       .onChange(async (value) => { this.plugin.settings.model = value.trim(); await this.plugin.persistData(); }));
-    new Setting(containerEl).setName("Embedding model").setDesc("Optional. Enables hybrid BM25 + vector retrieval after reindexing.").addText((text) => text
+    new Setting(containerEl).setName("Embedding model").setDesc("Optional. Type a model ID to enable hybrid BM25 + vector retrieval; grey example text is not a saved value.").addText((text) => text
       .setPlaceholder("nomic-embed-text")
       .setValue(this.plugin.settings.embeddingModel)
       .onChange(async (value) => { this.plugin.settings.embeddingModel = value.trim(); await this.plugin.persistData(); }));

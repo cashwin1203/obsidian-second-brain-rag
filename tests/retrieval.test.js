@@ -9,6 +9,7 @@ import {
   parsePdfPages,
   searchIndex,
   searchVectorIndex,
+  withTimeout,
 } from "../src/retrieval.js";
 
 test("parses headings without treating fenced examples as sections", () => {
@@ -53,4 +54,12 @@ test("combines lexical and semantic retrieval across Markdown and PDF pages", ()
   assert.equal(results.length, 2);
   assert.equal(results[0].path, "AI.md");
   assert.equal(results[1].page, 1);
+});
+
+test("times out a stalled PDF task so indexing can continue", async () => {
+  await assert.rejects(
+    withTimeout(new Promise(() => {}), 5, "PDF extraction timed out"),
+    /PDF extraction timed out/,
+  );
+  assert.equal(await withTimeout(Promise.resolve("next PDF"), 50, "timed out"), "next PDF");
 });

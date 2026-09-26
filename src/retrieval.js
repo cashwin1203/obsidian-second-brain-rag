@@ -83,6 +83,20 @@ export function parsePdfPages(path, pages, maxCharacters = 1800) {
   return chunks;
 }
 
+export async function withTimeout(promise, milliseconds, message) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), milliseconds);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function parseDocumentText(path, text, kind = "document", maxCharacters = 1800) {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (!normalized) return [];
