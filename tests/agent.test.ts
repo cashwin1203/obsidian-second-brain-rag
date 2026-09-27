@@ -18,6 +18,7 @@ function testTools(excerpt = "Human review is required before consequential deci
   return createReadOnlyTools({
     searchBrain: async () => ({
       retrievalMode: "bm25",
+      corpus: "all",
       evidence: [{ id: "S1", path: "Policy.md", heading: "Review", excerpt, kind: "markdown", score: 2 }],
     }),
     readSource: async ({ sourcePath }) => ({ contentType: "text", sourcePath, text: excerpt }),
@@ -34,7 +35,7 @@ test("runs a model-controlled search, read, and answer loop", async () => {
   assert.equal(result.refused, false);
   assert.equal(result.retrievalMode, "bm25");
   assert.deepEqual(result.steps.filter((step) => step.type === "tool").map((step) => step.toolName), ["search_brain", "read_source"]);
-  assert.equal(result.prompt.version, "1.0.0");
+  assert.equal(result.prompt.version, "1.1.0");
 });
 
 test("repairs an unsupported citation once", async () => {
@@ -78,6 +79,7 @@ test("keeps citation IDs unique across repeated searches", async () => {
   const tools = createReadOnlyTools({
     searchBrain: async () => ({
       retrievalMode: "bm25",
+      corpus: "all",
       evidence: [{
         id: "S1",
         path: searches++ ? "Second.md" : "First.md",
@@ -95,5 +97,28 @@ test("keeps citation IDs unique across repeated searches", async () => {
   ]);
   const result = await runAgent({ question: "Compare the sources", client, tools });
   assert.deepEqual(result.evidence.map((source) => source.id), ["S1", "S2"]);
+  assert.equal(result.refused, false);
+});
+
+test("supports an explicit wiki-first search followed by raw-source fallback", async () => {
+  const corpora: string[] = [];
+  const tools = createReadOnlyTools({
+    searchBrain: async ({ corpus }) => {
+      corpora.push(corpus);
+      return {
+        retrievalMode: "bm25",
+        corpus,
+        evidence: corpus === "wiki" ? [] : [{ id: "S1", path: "Sources/Brief.docx", heading: "Document", excerpt: "Grounded evidence.", kind: "docx" }],
+      };
+    },
+    readSource: async ({ sourcePath }) => ({ contentType: "text", sourcePath, text: "Grounded evidence." }),
+  });
+  const client = new FakeClient([
+    { content: "", toolCalls: [{ id: "1", name: "search_brain", arguments: '{"query":"evidence","corpus":"wiki"}' }] },
+    { content: "", toolCalls: [{ id: "2", name: "search_brain", arguments: '{"query":"evidence","corpus":"sources"}' }] },
+    { content: "The source contains grounded evidence [S1].", toolCalls: [] },
+  ]);
+  const result = await runAgent({ question: "What is the evidence?", client, tools });
+  assert.deepEqual(corpora, ["wiki", "sources"]);
   assert.equal(result.refused, false);
 });

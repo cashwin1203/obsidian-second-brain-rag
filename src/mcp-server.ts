@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { extractText } from "unpdf";
 import mammoth from "mammoth";
-import { buildEvidence, buildIndex, parseDocumentText, parseMarkdown, parsePdfPages, searchIndex, withTimeout } from "./retrieval.js";
+import { buildEvidence, buildIndex, parseDocumentText, parseMarkdown, parsePdfPages, searchIndex, subsetIndex, withTimeout } from "./retrieval.js";
 import { readSourceArgsSchema, searchBrainArgsSchema, type EvidenceRecord, type ReadSourceResult } from "./contracts.js";
 import { createReadOnlyTools, executeTool } from "./tools.js";
 
@@ -87,10 +87,17 @@ function plainEvidence(items: Array<{
 }
 
 const tools = createReadOnlyTools({
-  searchBrain: async ({ query, limit }) => ({
-    retrievalMode: "bm25",
-    evidence: plainEvidence(buildEvidence(searchIndex(await loadIndex(), query, limit), 1200)),
-  }),
+  searchBrain: async ({ query, limit, corpus }) => {
+    const all = await loadIndex();
+    const index = corpus === "all" ? all : subsetIndex(all, (chunk: { path: string }) => (
+      corpus === "wiki" ? chunk.path.startsWith("Wiki/") : !chunk.path.startsWith("Wiki/")
+    ));
+    return {
+      retrievalMode: "bm25",
+      corpus,
+      evidence: plainEvidence(buildEvidence(searchIndex(index, query, limit), 1200)),
+    };
+  },
   readSource: async ({ sourcePath, page }): Promise<ReadSourceResult> => {
     const file = await resolveSource(sourcePath);
     const extension = path.extname(file).toLowerCase();
@@ -119,7 +126,7 @@ const tools = createReadOnlyTools({
   },
 });
 
-const server = new McpServer({ name: "obsidian-second-brain", version: "0.4.0" });
+const server = new McpServer({ name: "obsidian-second-brain", version: "0.5.0" });
 
 server.registerTool("search_brain", {
   description: "Search Markdown notes, text-based PDFs, and Word documents in the configured Obsidian vault.",

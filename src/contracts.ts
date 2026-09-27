@@ -1,6 +1,7 @@
 import * as z from "zod/v4";
 
 export const retrievalModeSchema = z.enum(["bm25", "vector", "hybrid", "bm25_fallback"]);
+export const retrievalCorpusSchema = z.enum(["wiki", "sources", "all"]);
 
 export const modelPricingSchema = z.record(z.string().min(1), z.object({
   inputPerMillionUsd: z.number().min(0),
@@ -22,6 +23,7 @@ export const evidenceSchema = z.object({
 export const searchBrainArgsSchema = z.object({
   query: z.string().trim().min(1).max(2_000),
   limit: z.number().int().min(1).max(10).default(5),
+  corpus: retrievalCorpusSchema.default("all"),
 }).strict();
 
 export const readSourceArgsSchema = z.object({
@@ -31,7 +33,19 @@ export const readSourceArgsSchema = z.object({
 
 export const searchBrainResultSchema = z.object({
   retrievalMode: retrievalModeSchema,
+  corpus: retrievalCorpusSchema,
   evidence: z.array(evidenceSchema).max(10),
+}).strict();
+
+export const wikiNoteProposalSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  body: z.string().trim().min(1).max(50_000),
+  sources: z.array(z.object({
+    id: z.string().regex(/^S\d+$/),
+    path: z.string().trim().min(1).max(1_024),
+    page: z.number().int().min(1).optional(),
+    heading: z.string().optional(),
+  }).strict()).min(1).max(20),
 }).strict();
 
 export const readSourceResultSchema = z.discriminatedUnion("contentType", [
@@ -51,8 +65,10 @@ export const readSourceResultSchema = z.discriminatedUnion("contentType", [
 
 export type EvidenceRecord = z.infer<typeof evidenceSchema>;
 export type RetrievalMode = z.infer<typeof retrievalModeSchema>;
+export type RetrievalCorpus = z.infer<typeof retrievalCorpusSchema>;
 export type SearchBrainArgs = z.infer<typeof searchBrainArgsSchema>;
 export type ReadSourceArgs = z.infer<typeof readSourceArgsSchema>;
 export type SearchBrainResult = z.infer<typeof searchBrainResultSchema>;
 export type ReadSourceResult = z.infer<typeof readSourceResultSchema>;
+export type WikiNoteProposal = z.infer<typeof wikiNoteProposalSchema>;
 export type ToolPermission = "read" | "write";

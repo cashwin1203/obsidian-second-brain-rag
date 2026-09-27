@@ -20,7 +20,7 @@ When I need information from my accumulated notes, help me find and synthesize i
 4. Display the source path, heading, excerpt, and an action that opens the note.
 5. Re-index after vault changes.
 6. Refuse when evidence is missing or the generated answer cannot pass citation validation.
-7. Keep the vault read-only until a diff-and-approve workflow is implemented.
+7. Never write automatically; create a new Wiki memory note only after an editable preview and explicit approval.
 8. Let a configured tool-capable model decide when to search and when to inspect a returned source, within a bounded number of steps.
 
 ## Success criteria
@@ -44,6 +44,8 @@ The current milestone implements Retrieval-Augmented Generation (RAG) across Mar
 
 The latest 100 answer and indexing runs retain privacy-safe local metrics: prompt/request/response fingerprints and lengths, prompt version, retrieval mode, fallback use, model/tool/retrieval/end-to-end latency, retry counts, typed errors, provider-reported token usage, and configurable model cost. Raw questions, prompts, responses, source excerpts, API keys, and authorization headers are not stored.
 
+The assistant now routes agent searches to reviewed `Wiki/` Markdown first and immutable source material second. A citation-validated answer can be saved as a linked `Wiki/Synthesis/` note only after an editable preview and explicit approval. This memory path supports PDF, Word, image-description, and Markdown evidence uniformly; it never changes the source files and never overwrites an existing Wiki note.
+
 ## Deferred until measured
 
 - Retrieval evaluation and reranking
@@ -52,8 +54,8 @@ The latest 100 answer and indexing runs retain privacy-safe local metrics: promp
 - Gmail read-only OAuth ingestion
 - Audio and video transcription
 - Web ingestion
-- AI-maintained wiki pages
-- Approval-gated writes
+- Model-assisted editing of existing Wiki pages
+- Automatic source-note generation, Wiki index maintenance, link traversal, linting, and undo
 - Run-history and diagnostics UI, opt-in raw trace storage, and sanitized diagnostic export
 - Comprehensive retrieval, tool-selection, groundedness, and generation evaluation
 - Cloud sync and multi-user access

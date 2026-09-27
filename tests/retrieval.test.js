@@ -9,6 +9,7 @@ import {
   parsePdfPages,
   searchIndex,
   searchVectorIndex,
+  subsetIndex,
   withTimeout,
 } from "../src/retrieval.js";
 
@@ -62,4 +63,14 @@ test("times out a stalled PDF task so indexing can continue", async () => {
     /PDF extraction timed out/,
   );
   assert.equal(await withTimeout(Promise.resolve("next PDF"), 50, "timed out"), "next PDF");
+});
+
+test("builds a correctly scoped index for wiki-first retrieval", () => {
+  const index = buildIndex([
+    ...parseMarkdown("Wiki/Trust.md", "# Trust\nHuman review builds trust."),
+    ...parsePdfPages("Sources/PDFs/Trust.pdf", ["Human review builds accountable AI systems."]),
+  ]);
+  const wiki = subsetIndex(index, (chunk) => chunk.path.startsWith("Wiki/"));
+  assert.deepEqual(searchIndex(wiki, "human review", 5).map((chunk) => chunk.path), ["Wiki/Trust.md"]);
+  assert.equal(wiki.chunks.length, 1);
 });

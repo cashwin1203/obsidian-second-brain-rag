@@ -151,6 +151,10 @@ export function searchVectorIndex(index, queryVector, vectors, limit = 24) {
     .slice(0, Math.max(1, limit));
 }
 
+export function subsetIndex(index, predicate) {
+  return buildIndex(index.chunks.filter(predicate));
+}
+
 export function fuseRankings(rankings, limit = 6) {
   const fused = new Map();
   for (const ranking of rankings) {

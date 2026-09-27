@@ -43,7 +43,7 @@ export function createReadOnlyTools(capabilities: ToolCapabilities): ToolDefinit
   return [
     {
       name: "search_brain",
-      description: "Search the configured Obsidian vault for evidence relevant to a question. Returns source IDs, excerpts, paths, ranks, and retrieval mode.",
+      description: "Search the Obsidian vault. Search corpus=wiki first for reviewed memory, then corpus=sources when raw evidence is absent or needs verification. Use corpus=all only for broad retrieval.",
       permission: "read",
       inputSchema: searchBrainArgsSchema,
       outputSchema: searchBrainResultSchema,

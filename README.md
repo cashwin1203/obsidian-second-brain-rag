@@ -13,6 +13,7 @@ Repository: https://github.com/cashwin1203/obsidian-second-brain-rag
 3. Retrieve with BM25 or reciprocal-rank fusion over BM25 and vector results.
 4. Let a configured tool-capable model choose `search_brain`, optionally inspect a returned source with `read_source`, and stop within a configured step limit.
 5. Validate `[S1]`, `[S2]`, and similar citations before displaying the answer, with one repair attempt and a deterministic refusal when support is insufficient.
+6. Search approved Markdown Wiki memory first, fall back to immutable raw sources, and optionally save a grounded answer through a human-reviewed preview.
 
 Without an embedding model the plugin remains a complete sparse-RAG implementation. Configuring an embedding model enables hybrid retrieval.
 
@@ -36,6 +37,9 @@ Without an embedding model the plugin remains a complete sparse-RAG implementati
 - Chat, embedding, and image-call latency, retry, token, and configurable cost tracking
 - Retrieval-mode, BM25 fallback, typed failure, tool latency, and end-to-end latency tracking
 - Hashed request/response fingerprints without raw prompt, response, vault excerpt, API-key, or authorization-header logging
+- Wiki-first agent routing with explicit raw-source fallback
+- Preview-and-approve creation of linked Markdown memory under `Wiki/Synthesis/`
+- Durable source links across PDFs, Word documents, images, and Markdown notes
 
 ## Development
 
@@ -80,6 +84,12 @@ Optional pricing is configured in **Model pricing (USD per million tokens)** as 
 ```
 
 Token counts are recorded only when the endpoint reports them; missing usage is labelled unavailable rather than estimated. Local endpoints default to zero cost when no price is configured. Remote models without configured prices have unavailable cost.
+
+## Wiki-first memory
+
+Raw files remain immutable under `Sources/`. After a generated answer passes citation validation, **Save approved answer to Wiki** opens an editable preview. Only **Approve and create** writes a new note under `Wiki/Synthesis/`; cancel writes nothing and existing notes are never overwritten. The note links to every supporting PDF page, Word document, image, or Markdown note, so Obsidian's native graph reflects reviewed provenance rather than invented similarity edges.
+
+This is accurately described as a **Karpathy-inspired LLM Wiki** and **Wiki-first hybrid RAG**. It follows the raw-sources + maintained Markdown Wiki pattern in [Andrej Karpathy's LLM Wiki note](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), while the BM25/vector retrieval, MCP tools, Zod validation, citations, tracing, and approval boundary are this project's implementation. It is not Microsoft GraphRAG, and graph-assisted traversal remains a later measured capability.
 
 ## MCP server
 

@@ -1,6 +1,7 @@
 import {
   App,
   ItemView,
+  Modal,
   Notice,
   Plugin,
   PluginSettingTab,
@@ -20,10 +21,11 @@ import {
   parsePdfPages,
   searchIndex,
   searchVectorIndex,
+  subsetIndex,
   withTimeout,
 } from "./retrieval.js";
 import { runAgent, type AgentResult } from "./agent.js";
-import { modelPricingSchema, type EvidenceRecord, type ReadSourceResult, type RetrievalMode } from "./contracts.js";
+import { modelPricingSchema, wikiNoteProposalSchema, type EvidenceRecord, type ReadSourceResult, type RetrievalCorpus, type RetrievalMode, type WikiNoteProposal } from "./contracts.js";
 import { OpenAICompatibleModelClient } from "./model-client.js";
 import { createReadOnlyTools } from "./tools.js";
 import { AGENT_PROMPT } from "./prompts.js";
@@ -34,10 +36,12 @@ import {
   type ModelPricing,
   type RunTrace,
 } from "./run-history.js";
+import { createWikiProposal, renderWikiNote, wikiTargetPath } from "./wiki.js";
 
 const VIEW_TYPE = "second-brain-view";
 const PDF_EXTRACTION_TIMEOUT_MS = 120_000;
 const MODEL_REQUEST_TIMEOUT_MS = 120_000;
+const EMBEDDING_BATCH_SIZE = 8;
 
 interface SecondBrainSettings {
   baseUrl: string;
@@ -226,36 +230,40 @@ export default class SecondBrainPlugin extends Plugin {
     );
   }
 
-  async retrieve(question: string, limit = this.settings.maxSources, trace?: RunTraceRecorder) {
+  async retrieve(question: string, limit = this.settings.maxSources, trace?: RunTraceRecorder, corpus: RetrievalCorpus = "all") {
     const started = performance.now();
-    const lexical = searchIndex(this.index, question, limit * 4);
+    const index = corpus === "all" ? this.index : subsetIndex(this.index, (chunk: IndexedChunk) => (
+      corpus === "wiki" ? chunk.path.startsWith("Wiki/") : !chunk.path.startsWith("Wiki/")
+    ));
+    const lexical = searchIndex(index, question, limit * 4);
     if (!this.settings.embeddingModel) {
       trace?.recordRetrieval(performance.now() - started, "bm25");
-      return { evidence: buildEvidence(lexical.slice(0, limit)), mode: "bm25" as const };
+      return { evidence: buildEvidence(lexical.slice(0, limit)), mode: "bm25" as const, corpus };
     }
     try {
       const [queryVector] = await this.embedTexts([question], trace);
-      const vectors = new Map(this.index.chunks.flatMap((chunk: IndexedChunk) => {
+      const vectors = new Map(index.chunks.flatMap((chunk: IndexedChunk) => {
         const vector = this.embeddingCache[this.embeddingKey(chunk.key)];
         return vector ? [[chunk.key, vector] as [string, number[]]] : [];
       }));
-      const semantic = searchVectorIndex(this.index, queryVector, vectors, limit * 4);
+      const semantic = searchVectorIndex(index, queryVector, vectors, limit * 4);
       const results = fuseRankings([lexical, semantic], limit);
       trace?.recordRetrieval(performance.now() - started, "hybrid");
-      return { evidence: buildEvidence(results), mode: "hybrid" as const };
+      return { evidence: buildEvidence(results), mode: "hybrid" as const, corpus };
     } catch {
       trace?.recordRetrieval(performance.now() - started, "bm25_fallback");
       return {
         evidence: buildEvidence(lexical.slice(0, limit)),
         mode: "bm25_fallback" as const,
+        corpus,
       };
     }
   }
 
   private async refreshEmbeddings(trace: RunTraceRecorder) {
     const missing = this.index.chunks.filter((chunk: IndexedChunk) => !this.embeddingCache[this.embeddingKey(chunk.key)]);
-    for (let start = 0; start < missing.length; start += 32) {
-      const batch = missing.slice(start, start + 32);
+    for (let start = 0; start < missing.length; start += EMBEDDING_BATCH_SIZE) {
+      const batch = missing.slice(start, start + EMBEDDING_BATCH_SIZE);
       const vectors = await this.embedTexts(batch.map((chunk: IndexedChunk) => `${chunk.path}\n${chunk.heading}\n${chunk.text}`), trace);
       batch.forEach((chunk: IndexedChunk, index: number) => { this.embeddingCache[this.embeddingKey(chunk.key)] = vectors[index]; });
     }
@@ -315,9 +323,9 @@ export default class SecondBrainPlugin extends Plugin {
       hash: AGENT_PROMPT.hash,
     });
     const tools = createReadOnlyTools({
-      searchBrain: async ({ query, limit }) => {
-        const result = await this.retrieve(query, limit, trace);
-        return { retrievalMode: result.mode, evidence: plainEvidence(result.evidence) };
+      searchBrain: async ({ query, limit, corpus }) => {
+        const result = await this.retrieve(query, limit, trace, corpus);
+        return { retrievalMode: result.mode, corpus: result.corpus, evidence: plainEvidence(result.evidence) };
       },
       readSource: (args) => this.readSource(args.sourcePath, args.page),
     });
@@ -338,6 +346,17 @@ export default class SecondBrainPlugin extends Plugin {
       await this.persistData();
       throw error;
     }
+  }
+
+  async saveWikiNote(proposal: WikiNoteProposal) {
+    const checked = wikiNoteProposalSchema.parse(proposal);
+    const target = wikiTargetPath(checked.title);
+    if (this.app.vault.getAbstractFileByPath(target)) throw new Error(`Wiki note already exists: ${target}`);
+    for (const folder of ["Wiki", "Wiki/Synthesis"]) {
+      if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+    }
+    await this.app.vault.create(target, renderWikiNote(checked));
+    return target;
   }
 
   private async readSource(sourcePath: string, page?: number): Promise<ReadSourceResult> {
@@ -424,6 +443,9 @@ class SecondBrainView extends ItemView {
     root.createEl("p", { cls: "second-brain__privacy", text: "Your vault is indexed locally. Only retrieved excerpts are sent when a model is configured." });
     const input = root.createEl("textarea", { attr: { rows: "4", placeholder: "What do my notes say about...", "aria-label": "Question" } });
     const ask = root.createEl("button", { cls: "mod-cta", text: "Ask" });
+    const save = root.createEl("button", { text: "Save approved answer to Wiki" });
+    save.hidden = true;
+    let pendingProposal: WikiNoteProposal | null = null;
     const status = root.createEl("p", { cls: "second-brain__status", attr: { role: "status" } });
     const answer = root.createDiv({ cls: "second-brain__answer" });
     const toolHistory = root.createDiv({ cls: "second-brain__tools" });
@@ -433,6 +455,8 @@ class SecondBrainView extends ItemView {
       const question = input.value.trim();
       if (!question) return;
       ask.disabled = true;
+      save.hidden = true;
+      pendingProposal = null;
       status.setText("Searching your vault...");
       answer.empty();
       toolHistory.empty();
@@ -469,6 +493,10 @@ class SecondBrainView extends ItemView {
         }
         const safety = result.injectionSignals.length ? ` · ${result.injectionSignals.length} prompt-injection signal(s) treated as untrusted` : "";
         status.setText(`${result.refused ? "Agent refused without sufficient supported evidence" : "Answer passed citation checks"} · ${retrievalModeLabel(result.retrievalMode)}${safety}.`);
+        if (!result.refused && result.evidence.length) {
+          pendingProposal = createWikiProposal(question, result.answer, result.evidence);
+          save.hidden = false;
+        }
       } catch (error) {
         status.setText(error instanceof Error ? error.message : "Something went wrong.");
       } finally {
@@ -477,6 +505,15 @@ class SecondBrainView extends ItemView {
     };
 
     ask.addEventListener("click", () => void submit());
+    save.addEventListener("click", () => {
+      if (!pendingProposal) return;
+      new WikiApprovalModal(this.app, pendingProposal, async (proposal) => {
+        const target = await this.plugin.saveWikiNote(proposal);
+        new Notice(`Second Brain created ${target}`);
+        save.hidden = true;
+        await this.app.workspace.openLinkText(target, "", true);
+      }).open();
+    });
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void submit();
     });
@@ -493,6 +530,43 @@ class SecondBrainView extends ItemView {
     });
     item.createEl("div", { cls: "second-brain__heading", text: source.heading });
     item.createEl("p", { text: source.excerpt.slice(0, 500) });
+  }
+}
+
+class WikiApprovalModal extends Modal {
+  constructor(
+    app: App,
+    private proposal: WikiNoteProposal,
+    private approve: (proposal: WikiNoteProposal) => Promise<void>,
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    this.contentEl.createEl("h2", { text: "Review Wiki note" });
+    this.contentEl.createEl("p", { text: "Nothing is written until you approve. The source files remain unchanged." });
+    const title = this.contentEl.createEl("input", { attr: { type: "text", "aria-label": "Wiki note title" } });
+    title.value = this.proposal.title;
+    const body = this.contentEl.createEl("textarea", { attr: { rows: "14", "aria-label": "Wiki note body" } });
+    body.value = this.proposal.body;
+    const actions = this.contentEl.createDiv({ cls: "modal-button-container" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    const approve = actions.createEl("button", { cls: "mod-cta", text: "Approve and create" });
+    approve.addEventListener("click", async () => {
+      approve.disabled = true;
+      try {
+        const proposal = wikiNoteProposalSchema.parse({ ...this.proposal, title: title.value, body: body.value });
+        await this.approve(proposal);
+        this.close();
+      } catch (error) {
+        new Notice(error instanceof Error ? error.message : "Wiki note could not be created.");
+        approve.disabled = false;
+      }
+    });
+  }
+
+  onClose() {
+    this.contentEl.empty();
   }
 }
 

@@ -16,12 +16,14 @@ const evidence = {
 
 function tools() {
   return createReadOnlyTools({
-    searchBrain: async () => ({ retrievalMode: "bm25", evidence: [evidence] }),
+    searchBrain: async ({ corpus }) => ({ retrievalMode: "bm25", corpus, evidence: [evidence] }),
     readSource: async ({ sourcePath }) => ({ contentType: "text", sourcePath, text: "Human review is required." }),
   });
 }
 
 test("strictly validates tool arguments", async () => {
+  const result = await executeTool(tools(), "search_brain", { query: "review" });
+  assert.equal(result.corpus, "all");
   await assert.rejects(
     executeTool(tools(), "search_brain", { query: "review", limit: 3, unexpected: true }),
     /Unrecognized key/,
@@ -58,4 +60,3 @@ test("denies future write tools without human approval", async () => {
     { ok: true },
   );
 });
-
